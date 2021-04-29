@@ -1,6 +1,6 @@
+use std::env;
 use std::error::Error;
 use std::fs;
-use std::env;
 
 pub struct Config {
     pub query: String,
@@ -9,16 +9,26 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(args: &[String]) -> Result<Config, &str> {
+    // ! I do not understand why we need `static lifetime for the error...
+    pub fn new(mut args: env::Args) -> Result<Config, &'static str> {
+        args.next();
+
+        let query = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a query string"),
+        };
+
+        let filename = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a file name"),
+        };
+
         let case_sensitive = env::var("CASE_INSENSITIVE").is_err();
 
-        if args.len() < 3 {
-            return Err("not enough arguments");
-        }
         Ok(Config {
-            query: args[1].to_owned(),
-            filename: args[2].to_owned(),
-            case_sensitive: case_sensitive,
+            query,
+            filename,
+            case_sensitive,
         })
     }
 }
@@ -40,23 +50,10 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn search_case_sensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    // let mut result = vec![];
-    // for line in contents.lines() {
-    //     if line.contains(query) {
-    //         result.push(line);
-    //     }
-    // }
-
-    let results: Vec<&str> = contents
+    contents
         .lines()
-        .flat_map(|line| {
-            if line.contains(query) {
-                return Some(line);
-            }
-            None
-        })
-        .collect();
-    results
+        .filter(|line| line.contains(query))
+        .collect()
 }
 
 pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
@@ -81,7 +78,7 @@ mod tests {
         let config: Config = Config {
             query: String::from("ehh"),
             filename: String::from("poem.txt"),
-            case_sensitive: true
+            case_sensitive: true,
         };
         if let Err(err) = run(config) {
             panic!("{}", err)
@@ -94,7 +91,7 @@ mod tests {
         let config: Config = Config {
             query: String::from("ehh"),
             filename: String::from("poems.txt"),
-            case_sensitive: true
+            case_sensitive: true,
         };
         if let Err(err) = run(config) {
             panic!("{}", err)
